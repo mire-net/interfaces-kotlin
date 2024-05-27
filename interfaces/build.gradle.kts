@@ -36,6 +36,15 @@ publishing {
                 create<BasicAuthentication>("basic")
             }
         }
+
+        maven {
+            name = "GithubPackages"
+            url = uri("https://maven.pkg.github.com/IslandPractice/interfaces-kotlin")
+            credentials {
+                username = project.findProperty("gpr.user") as String? ?: System.getenv("GH_USER")
+                password = project.findProperty("gpr.key") as String? ?: System.getenv("GH_TOKEN")
+            }
+        }
     }
     publications {
         create<MavenPublication>("maven") {

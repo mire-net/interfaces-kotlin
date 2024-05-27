@@ -30,6 +30,15 @@ subprojects {
     repositories {
         mavenCentral()
         maven("https://papermc.io/repo/repository/maven-public/")
+
+        maven {
+            name = "GithubPackages"
+            url = uri("https://maven.pkg.github.com/IslandPractice/interfaces-kotlin")
+            credentials {
+                username = project.findProperty("gpr.user") as String? ?: System.getenv("GH_USER")
+                password = project.findProperty("gpr.key") as String? ?: System.getenv("GH_TOKEN")
+            }
+        }
     }
 
     configure<SpotlessExtension> {
@@ -40,7 +49,7 @@ subprojects {
 
     // Configure any existing RunServerTasks
     tasks.withType<RunServer> {
-        minecraftVersion("1.20.4")
+        minecraftVersion("1.20.6")
         jvmArgs("-Dio.papermc.paper.suppress.sout.nags=true")
     }
 
