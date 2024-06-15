@@ -7,7 +7,7 @@ plugins {
     alias(libs.plugins.run.paper) apply false
 
     // Kotlin plugin prefers to be applied to parent when it's used in multiple sub-modules.
-    kotlin("jvm") version "1.9.22" apply false
+    kotlin("jvm") version "1.9.24" apply false
     alias(libs.plugins.spotless)
 }
 
@@ -15,7 +15,7 @@ val javaVersion: Int = 21
 
 allprojects {
     group = "com.noxcrew.interfaces"
-    version = "1.1.8-SNAPSHOT"
+    version = "1.2.0-SNAPSHOT"
 
     tasks.withType<JavaCompile> {
         sourceCompatibility = javaVersion.toString()
