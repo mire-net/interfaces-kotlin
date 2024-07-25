@@ -20,7 +20,7 @@ import org.bukkit.plugin.java.JavaPlugin
 import org.incendo.cloud.execution.ExecutionCoordinator
 import org.incendo.cloud.kotlin.coroutines.extension.suspendingHandler
 import org.incendo.cloud.kotlin.extension.buildAndRegister
-import org.incendo.cloud.paper.PaperCommandManager
+import org.incendo.cloud.paper.LegacyPaperCommandManager
 
 public class ExamplePlugin : JavaPlugin(), Listener {
 
@@ -38,11 +38,18 @@ public class ExamplePlugin : JavaPlugin(), Listener {
     private var counter by counterProperty
 
     override fun onEnable() {
-        val commandManager = PaperCommandManager.builder()
-            .executionCoordinator(ExecutionCoordinator.asyncCoordinator())
-            .buildOnEnable(this)
-
+        val commandManager = LegacyPaperCommandManager.createNative(this, ExecutionCoordinator.asyncCoordinator())
         commandManager.buildAndRegister("interfaces") {
+            registerCopy {
+                literal("close")
+
+                suspendingHandler {
+                    val player = it.sender() as Player
+                    InterfacesListeners.INSTANCE.getOpenInterface(player.uniqueId)?.close()
+                    player.inventory.clear()
+                }
+            }
+
             registerCopy {
                 literal("simple")
 
@@ -146,6 +153,13 @@ public class ExamplePlugin : JavaPlugin(), Listener {
     }
 
     private fun playerInterface() = buildPlayerInterface {
+        // Use modern logic to only cancel the item interaction and not block interactions while
+        // using this interface
+        onlyCancelItemInteraction = true
+
+        // Prioritise block interactions!
+        prioritiseBlockInteractions = true
+
         withTransform { pane, _ ->
             val item = ItemStack(Material.COMPASS).name("interfaces example")
 

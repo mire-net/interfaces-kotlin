@@ -33,8 +33,27 @@ public open class InterfaceProperties<P : Pane> {
     /** A post-processor applied to all items placed in the inventory. */
     public var itemPostProcessor: ((ItemStack) -> Unit)? = {}
 
+    /** Whether interaction should only cancel the item effects and not the world effects. */
+    public var onlyCancelItemInteraction: Boolean = false
+
+    /** Whether to prioritise block interactions over item interactions when right-clicking. */
+    public var prioritiseBlockInteractions: Boolean = false
+
     /** Whether clicking on empty slots should be cancelled. */
     public var preventClickingEmptySlots: Boolean = true
+
+    /**
+     * Whether the player's own inventory should be editable if [preventClickingEmptySlots] is `true`. Only allowed for
+     * [ChestInterfaceBuilder].
+     */
+    public var allowClickingOwnInventoryIfClickingEmptySlotsIsPrevented: Boolean = false
+        get() {
+            // This setting is not allowed on non-chest interfaces!
+            if (this !is ChestInterfaceBuilder) {
+                return false
+            }
+            return field
+        }
 
     /**
      * Persists items added to this pane in a previous instance.
@@ -47,7 +66,7 @@ public open class InterfaceProperties<P : Pane> {
     public var inheritExistingItems: Boolean = false
 
     /** Whether close handlers should be called when switching to a different view. */
-    public var callCloseHandlerOnViewSwitch: Boolean = true
+    public var callCloseHandlerOnViewSwitch: Boolean = false
 
     /** Whether to place empty air elements in all background slots. */
     public var fillMenuWithAir: Boolean = false

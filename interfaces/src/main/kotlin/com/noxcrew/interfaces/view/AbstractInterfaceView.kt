@@ -15,7 +15,6 @@ import com.noxcrew.interfaces.properties.Trigger
 import com.noxcrew.interfaces.transform.AppliedTransform
 import com.noxcrew.interfaces.utilities.CollapsablePaneMap
 import com.noxcrew.interfaces.utilities.forEachInGrid
-import com.noxcrew.interfaces.utilities.runSync
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.withTimeout
@@ -94,8 +93,10 @@ public abstract class AbstractInterfaceView<I : InterfacesInventory, T : Interfa
         reason: InventoryCloseEvent.Reason = InventoryCloseEvent.Reason.UNKNOWN,
         changingView: Boolean = reason == InventoryCloseEvent.Reason.OPEN_NEW
     ) {
-        // End a possible chat query with the listener
-        InterfacesListeners.INSTANCE.abortQuery(player.uniqueId, this)
+        if (!changingView) {
+            // End a possible chat query with the listener (unless we're changing views)
+            InterfacesListeners.INSTANCE.abortQuery(player.uniqueId, this)
+        }
 
         // Ensure that the menu does not open
         openIfClosed.set(false)
@@ -147,6 +148,9 @@ public abstract class AbstractInterfaceView<I : InterfacesInventory, T : Interfa
     }
 
     override suspend fun open() {
+        // Don't open an interface for an offline player
+        if (!player.isConnected) return
+
         // Indicate that the menu should be opened after the next time rendering completes
         // and that it should be open right now
         openIfClosed.set(true)
@@ -173,7 +177,8 @@ public abstract class AbstractInterfaceView<I : InterfacesInventory, T : Interfa
         // Ensure we always close on the main thread! Don't close if we are
         // changing views though.
         if (!changingView && isOpen()) {
-            runSync {
+            InterfacesListeners.INSTANCE.runSync {
+                if (!player.isConnected) return@runSync
                 player.closeInventory()
             }
         }
@@ -282,6 +287,9 @@ public abstract class AbstractInterfaceView<I : InterfacesInventory, T : Interfa
     }
 
     protected open fun drawPaneToInventory(drawNormalInventory: Boolean, drawPlayerInventory: Boolean) {
+        // Stop drawing if the player disconnected
+        if (!player.isConnected) return
+
         // Determine all slots we need to clear if unused
         val leftovers = mutableListOf<Pair<Int, Int>>()
         forEachInGrid(backing.totalRows(), COLUMNS_IN_CHEST) { row, column ->
@@ -387,9 +395,14 @@ public abstract class AbstractInterfaceView<I : InterfacesInventory, T : Interfa
         // Draw the contents of the inventory synchronously because
         // we don't want it to happen in between ticks and show
         // a half-finished inventory.
-        runSync {
+        InterfacesListeners.INSTANCE.runSync {
             // If the menu has since been requested to close we ignore all this
             if (!shouldBeOpened.get()) return@runSync
+
+            // Save persistent items if the view is currently opened
+            if (player.openInventory.topInventory.holder == this) {
+                savePersistentItems(player.openInventory.topInventory)
+            }
 
             // Determine if the inventory is currently open or being opened immediately,
             // otherwise we never draw to player inventories. This ensures lingering
@@ -400,14 +413,18 @@ public abstract class AbstractInterfaceView<I : InterfacesInventory, T : Interfa
             callback(createdInventory)
 
             if ((openIfClosed.get() && !isOpen) || createdInventory) {
-                openInventory()
+                InterfacesListeners.INSTANCE.viewBeingOpened = this
+                if (player.isConnected) openInventory()
+                if (InterfacesListeners.INSTANCE.viewBeingOpened == this) {
+                    InterfacesListeners.INSTANCE.viewBeingOpened = null
+                }
                 openIfClosed.set(false)
                 firstPaint = false
             }
         }
     }
 
-    override fun runChatQuery(timeout: Duration, onCancel: () -> Unit, onComplete: (Component) -> Unit) {
+    override fun runChatQuery(timeout: Duration, onCancel: suspend () -> Unit, onComplete: suspend (Component) -> Unit) {
         InterfacesListeners.INSTANCE.startChatQuery(this, timeout, onCancel, onComplete)
     }
 }
