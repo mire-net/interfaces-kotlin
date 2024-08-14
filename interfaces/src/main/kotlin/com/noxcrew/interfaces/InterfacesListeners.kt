@@ -4,7 +4,7 @@ import com.destroystokyo.paper.MaterialSetTag
 import com.destroystokyo.paper.MaterialTags
 import com.github.benmanes.caffeine.cache.Cache
 import com.github.benmanes.caffeine.cache.Caffeine
-import com.noxcrew.interfaces.Constants.SCOPE
+import com.noxcrew.interfaces.InterfacesConstants.SCOPE
 import com.noxcrew.interfaces.click.ClickContext
 import com.noxcrew.interfaces.click.ClickHandler
 import com.noxcrew.interfaces.click.CompletableClickHandler
@@ -133,7 +133,7 @@ public class InterfacesListeners private constructor(private val plugin: Plugin)
     private data class ChatQuery(
         val view: InterfaceView,
         val onCancel: suspend () -> Unit,
-        val onComplete: suspend (Component) -> Unit,
+        val onComplete: suspend (Component) -> Boolean,
         val id: UUID
     )
 
@@ -154,6 +154,15 @@ public class InterfacesListeners private constructor(private val plugin: Plugin)
     private val openPlayerInterfaceViews: Cache<UUID, PlayerInterfaceView> = Caffeine.newBuilder()
         .weakValues()
         .build()
+
+    /** Re-opens the current open interface of [player]. */
+    public fun reopenInventory(player: Player) {
+        getOpenInterface(player.uniqueId)?.also {
+            SCOPE.launch {
+                it.open()
+            }
+        }
+    }
 
     /** Returns the currently open interface for [playerId]. */
     public fun getOpenInterface(playerId: UUID): PlayerInterfaceView? {
@@ -226,7 +235,7 @@ public class InterfacesListeners private constructor(private val plugin: Plugin)
             val shouldReopen = reason in REOPEN_REASONS && !event.player.isDead && openInterface != null
 
             // Mark the current view as closed properly
-            view.markClosed(reason, shouldReopen || reason == Reason.OPEN_NEW)
+            view.markClosed(reason)
 
             // If possible, open back up a previous interface
             if (shouldReopen) {
@@ -243,7 +252,7 @@ public class InterfacesListeners private constructor(private val plugin: Plugin)
         val isPlayerInventory = (event.clickedInventory ?: event.inventory).holder is Player
 
         // Run base click handling
-        if (handleClick(view, clickedPoint, event.click, event.hotbarButton, isPlayerInventory)) {
+        if (handleClick(view, clickedPoint, event.click, event.hotbarButton, isPlayerInventory, false)) {
             event.isCancelled = true
         }
 
@@ -406,7 +415,7 @@ public class InterfacesListeners private constructor(private val plugin: Plugin)
             return
         }
 
-        if (handleClick(view, clickedPoint, click, -1, true)) {
+        if (handleClick(view, clickedPoint, click, -1, isPlayerInventory = true, interact = true)) {
             // Support modern behavior where we don't interfere with block interactions
             if (view.builder.onlyCancelItemInteraction) {
                 event.setUseItemInHand(Event.Result.DENY)
@@ -477,9 +486,7 @@ public class InterfacesListeners private constructor(private val plugin: Plugin)
 
     @EventHandler
     public fun onRespawn(event: PlayerRespawnEvent) {
-        SCOPE.launch {
-            getOpenInterface(event.player.uniqueId)?.open()
-        }
+        reopenInventory(event.player)
     }
 
     @EventHandler(priority = EventPriority.LOWEST)
@@ -492,8 +499,9 @@ public class InterfacesListeners private constructor(private val plugin: Plugin)
 
         // Complete the query and re-open the view
         SCOPE.launch {
-            query.onComplete(event.message())
-            query.view.open()
+            if (query.onComplete(event.message())) {
+                query.view.open()
+            }
         }
 
         // Prevent the message from sending
@@ -550,7 +558,8 @@ public class InterfacesListeners private constructor(private val plugin: Plugin)
         clickedPoint: GridPoint,
         click: ClickType,
         slot: Int,
-        isPlayerInventory: Boolean
+        isPlayerInventory: Boolean,
+        interact: Boolean
     ): Boolean {
         // Determine the type of click, if nothing was clicked we allow it
         val raw = view.pane.getRaw(clickedPoint)
@@ -574,7 +583,7 @@ public class InterfacesListeners private constructor(private val plugin: Plugin)
         view.isProcessingClick = true
 
         // Forward this click to all pre-processors
-        val clickContext = ClickContext(view.player, view, click, slot)
+        val clickContext = ClickContext(view.player, view, click, slot, interact)
         view.builder.clickPreprocessors
             .forEach { handler -> ClickHandler.process(handler, clickContext) }
 
@@ -633,7 +642,7 @@ public class InterfacesListeners private constructor(private val plugin: Plugin)
         view: InterfaceView,
         timeout: Duration,
         onCancel: suspend () -> Unit,
-        onComplete: suspend (Component) -> Unit
+        onComplete: suspend (Component) -> Boolean
     ) {
         // Determine if the player has this inventory open
         if (!view.isOpen()) return

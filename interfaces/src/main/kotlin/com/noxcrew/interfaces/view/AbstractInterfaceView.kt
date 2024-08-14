@@ -1,7 +1,7 @@
 package com.noxcrew.interfaces.view
 
 import com.google.common.collect.HashMultimap
-import com.noxcrew.interfaces.Constants.SCOPE
+import com.noxcrew.interfaces.InterfacesConstants.SCOPE
 import com.noxcrew.interfaces.InterfacesListeners
 import com.noxcrew.interfaces.event.DrawPaneEvent
 import com.noxcrew.interfaces.grid.GridPoint
@@ -424,7 +424,7 @@ public abstract class AbstractInterfaceView<I : InterfacesInventory, T : Interfa
         }
     }
 
-    override fun runChatQuery(timeout: Duration, onCancel: suspend () -> Unit, onComplete: suspend (Component) -> Unit) {
+    override fun runChatQuery(timeout: Duration, onCancel: suspend () -> Unit, onComplete: suspend (Component) -> Boolean) {
         InterfacesListeners.INSTANCE.startChatQuery(this, timeout, onCancel, onComplete)
     }
 }

@@ -8,10 +8,11 @@ import kotlinx.coroutines.asCoroutineDispatcher
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
 
-internal object Constants {
+/** Holds the shared scope used for any interfaces coroutines. */
+public object InterfacesConstants {
 
     /** The [CoroutineScope] for any suspending operations performed by interfaces. */
-    internal val SCOPE = CoroutineScope(
+    public val SCOPE: CoroutineScope = CoroutineScope(
         CoroutineName("interfaces") +
             SupervisorJob() +
             run {
